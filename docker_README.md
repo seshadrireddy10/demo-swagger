@@ -430,6 +430,96 @@ A comprehensive cheat sheet covering standard instructions used to compile and c
 An optimized reference guide demonstrating how to configure, build, and deploy high-performance, secure multi-stage Docker container images.
 
 ---
+# Simple Docker Build Tutorial
+
+A complete, step-by-step example demonstrating how to create a simple Node.js web application, write its Dockerfile, compile the image, and launch the container.
+
+---
+
+## 📁 1. Set Up Your Project Files
+
+Create a new directory on your machine, navigate into it, and create the following two files:
+
+### File A: `app.js` (Your Application)
+```javascript
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Hello! Your simple Docker container is running successfully.\n');
+});
+
+// Listen on port 8080
+server.listen(8080, () => {
+    console.log('Server is running on port 8080');
+});
+```
+
+### File B: `Dockerfile` (Your Build Instructions)
+Create a file named exactly `Dockerfile` (**no file extension**) in the same directory:
+
+```dockerfile
+# Step 1: Use an official lightweight Node.js runtime as the base image
+FROM node:20-alpine
+
+# Step 2: Set the working directory inside the container
+WORKDIR /usr/src/app
+
+# Step 3: Copy your local app.js file into the container's working directory
+COPY app.js .
+
+# Step 4: Document that the container listens on port 8080
+EXPOSE 8080
+
+# Step 5: Define the command to run your app when the container starts
+CMD ["node", "app.js"]
+```
+
+---
+
+## 🛠️ 2. Build the Docker Image
+
+Open your terminal, ensure you are inside the directory containing both files, and execute the build command:
+
+```bash
+docker build -t simple-node-app:1.0 .
+```
+
+*   `-t simple-node-app:1.0`: Tags (names) your image `simple-node-app` with version `1.0`.
+*   `.`: Tells Docker to look for the `Dockerfile` in your current working directory.
+
+---
+
+## 🚀 3. Run the Container
+
+Once the build finishes, spin up a live running container instance using your new image:
+
+```bash
+docker run -d -p 8080:8080 --name my-running-app simple-node-app:1.0
+```
+
+*   `-d`: Runs the container in the background (detached mode).
+*   `-p 8080:8080`: Maps port `8080` of your host computer to port `8080` inside the container.
+*   `--name my-running-app`: Assigns a custom tracking name to your running container.
+
+---
+
+## 🔎 4. Test It
+
+Open your web browser or execute a standard `curl` command inside your terminal:
+
+```bash
+curl http://localhost:8080
+```
+
+**Expected Output:**
+```text
+Hello! Your simple Docker container is running successfully.
+```
+
+
+
+
 
 ## 📄 The Multi-Stage Dockerfile
 
