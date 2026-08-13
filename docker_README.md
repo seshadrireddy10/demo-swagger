@@ -244,3 +244,184 @@ Commands designed to clear cache and reclaim system space.
     ```
     *   `-a`: Removes all unused images, not just dangling ones.
     *   `--volumes`: Includes unused volumes in the wipe out.
+# Dockerfile Instructions Reference Guide
+
+A comprehensive cheat sheet covering standard instructions used to compile and configure Docker container images.
+
+---
+
+## 🏗️ 1. Core Build Initialization
+
+### FROM
+*   **Purpose**: Initializes a new build stage and sets the base image.
+*   **Syntax**: 
+    ```dockerfile
+    FROM <image>[:<tag>]
+    FROM <image> AS <stage_name>  # For multi-stage builds
+    ```
+*   **Details**: Must be the first instruction in a Dockerfile (except for global `ARG`). Using specific tags (like `node:20-alpine`) prevents breaking changes when base images update.
+
+### ARG
+*   **Purpose**: Defines variables that users can pass at build-time using `docker build --build-arg <var>=<val>`.
+*   **Syntax**: 
+    ```dockerfile
+    ARG <name>[=<default value>]
+    ```
+*   **Details**: These variables do not persist in the final running container image. Do not use them for secrets.
+
+---
+
+## 📂 2. File and Environment Configuration
+
+### WORKDIR
+*   **Purpose**: Sets the working directory for subsequent `RUN`, `CMD`, `ENTRYPOINT`, `COPY`, and `ADD` instructions.
+*   **Syntax**: 
+    ```dockerfile
+    WORKDIR /path/to/directory
+    ```
+*   **Details**: If the directory does not exist, Docker creates it automatically. Always use absolute paths instead of `cd` commands.
+
+### ENV
+*   **Purpose**: Sets persistent environment variables available during build time and inside the running container.
+*   **Syntax**: 
+    ```dockerfile
+    ENV <key>=<value>
+    ```
+*   **Details**: These values persist in the final image layers. They can be overridden at runtime using `docker run -e "KEY=VALUE"`.
+
+### LABEL
+*   **Purpose**: Adds metadata to an image via key-value pairs.
+*   **Syntax**: 
+    ```dockerfile
+    LABEL <key>=<value> <key>=<value>
+    ```
+*   **Details**: Used to store licensing info, version numbers, or organizational ownership. Inspect them using `docker inspect`.
+
+---
+
+## 📥 3. File Operations
+
+### COPY
+*   **Purpose**: Copies new files or directories from your host machine into the container filesystem.
+*   **Syntax**: 
+    ```dockerfile
+    COPY <src>... <dest>
+    ```
+*   **Details**: The preferred command for moving files. It features a `--from=<name>` flag to copy files between stages in multi-stage builds.
+
+### ADD
+*   **Purpose**: Copies files, unpacks local archive files (`.tar`, `.gz`), or fetches remote URLs.
+*   **Syntax**: 
+    ```dockerfile
+    ADD <src>... <dest>
+    ```
+*   **Details**: Avoid using `ADD` for remote URLs because it leaves unwanted cache files; use `RUN curl` or `RUN wget` instead. Use `COPY` unless you explicitly need auto-extraction.
+
+---
+
+## 🛠️ 4. Build-Time Execution
+
+### RUN
+*   **Purpose**: Executes any commands in a new layer on top of the current image and commits the results.
+*   **Syntax**: 
+    ```dockerfile
+    # Shell form
+    RUN apt-get update && apt-get install -y curl
+
+    # Exec form
+    RUN ["apt-get", "install", "-y", "curl"]
+    ```
+*   **Details**: Chain multiple commands with `&&` and `\` to minimize the total number of image layers created.
+
+---
+
+## ⚙️ 5. Runtime Configuration & Lifecycle
+
+### CMD
+*   **Purpose**: Provides default commands or arguments for an executing container.
+*   **Syntax**: 
+    ```dockerfile
+    # Exec form (preferred)
+    CMD ["executable","param1","param2"]
+
+    # As default parameters to ENTRYPOINT
+    CMD ["param1","param2"]
+    ```
+*   **Details**: There can only be one active `CMD` in a Dockerfile. If you specify arguments during `docker run`, they override this entire instruction.
+
+### ENTRYPOINT
+*   **Purpose**: Configures a container to run as an executable, making it difficult to override the base command.
+*   **Syntax**: 
+    ```dockerfile
+    ENTRYPOINT ["executable", "param1"]
+    ```
+*   **Details**: CLI arguments passed during `docker run` append directly to this command instead of overwriting it.
+
+### EXPOSE
+*   **Purpose**: Documents the specific network ports the container intends to listen on at runtime.
+*   **Syntax**: 
+    ```dockerfile
+    EXPOSE <port>[/<protocol>]
+    ```
+*   **Details**: Acts purely as internal documentation between the image creator and the operator. It does not actually publish ports to the host machine.
+
+### VOLUME
+*   **Purpose**: Creates a directory mounting point to hold externally persistent data.
+*   **Syntax**: 
+    ```dockerfile
+    VOLUME ["/data"]
+    ```
+*   **Details**: Bypasses the container storage layer. Any data written here survives container deletions and does not bloat the image size.
+
+### USER
+*   **Purpose**: Sets the username or UID to use when running the remaining build instructions and the container runtime.
+*   **Syntax**: 
+    ```dockerfile
+    USER <user>[:<group>]
+    ```
+*   **Details**: Vital for security compliance. Dropping down from root privileges prevents unauthorized access exploits inside runtime environments.
+
+### HEALTHCHECK
+*   **Purpose**: Configures a recurring command to test whether the internal application process is still healthy.
+*   **Syntax**: 
+    ```dockerfile
+    HEALTHCHECK [--options] CMD <command>
+    ```
+*   **Details**: Allows Docker or orchestration engines (like Kubernetes) to restart containers automatically if web servers freeze up.
+
+### STOPSIGNAL
+*   **Purpose**: Sets the specific system call signal sent to the container to trigger a graceful exit.
+*   **Syntax**: 
+    ```dockerfile
+    STOPSIGNAL <signal>
+    ```
+*   **Details**: Defaults to `SIGTERM`. Useful if your unique application framework expects alternative signals like `SIGKILL` or `SIGINT` to safely close database handles.
+
+### SHELL
+*   **Purpose**: Overrides the default system shell used for executing the shell form of commands.
+*   **Syntax**: 
+    ```dockerfile
+    SHELL ["executable", "parameters"]
+    ```
+*   **Details**: Defaults to `["/bin/sh", "-c"]` on Linux or `["cmd", "/S", "/C"]` on Windows. Helpful when swapping to powershell or bash.
+
+---
+
+## 🔬 6. Advanced Automation & Legacy
+
+### ONBUILD
+*   **Purpose**: Registers a trigger instruction executed later whenever this image serves as a base `FROM` image for a separate build.
+*   **Syntax**: 
+    ```dockerfile
+    ONBUILD COPY . /app/src
+    ```
+*   **Details**: Useful for shared enterprise boilerplate templates where developers build language-specific modules on top of a central base structure.
+
+### MAINTAINER (Deprecated)
+*   **Purpose**: Set the author field of generated images.
+*   **Syntax**: 
+    ```dockerfile
+    MAINTAINER <name>
+    ```
+*   **Details**: Completely deprecated across all modern platforms. Replace this functionality entirely by adopting standardized `LABEL` tags.
+      
