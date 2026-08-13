@@ -425,9 +425,71 @@ A comprehensive cheat sheet covering standard instructions used to compile and c
     ```
 *   **Details**: Completely deprecated across all modern platforms. Replace this functionality entirely by adopting standardized `LABEL` tags.
 
-# Multi-Stage Docker Build Guide
+# Dockerfile Instructions: Core Differences Guide
 
-An optimized reference guide demonstrating how to configure, build, and deploy high-performance, secure multi-stage Docker container images.
+The differences between these critical Dockerfile instructions center primarily around **when** they execute or **how much advanced functionality** they provide.
+
+---
+
+## 🏗️ 1. RUN vs. CMD
+
+The primary difference is **when** the specific instruction executes.
+
+```text
+[ docker build ] ──> RUN runs here (Creates a permanent image layer)
+[ docker run   ] ──> CMD runs here (The default start command for the container)
+```
+
+*   **`RUN` (Build-time)**: Executes commands during the image building process. It installs packages, compiles code, or creates folders. Each `RUN` creates a permanent new layer in your static image.
+    *   *Example:* `RUN apt-get update && apt-get install -y curl`
+*   **`CMD` (Runtime)**: Defines the default command that executes only when a container is launched from the image. It does not run during the build and does not create new files inside the image. It can be easily overridden at runtime.
+    *   *Example:* `CMD ["node", "server.js"]`
+
+---
+
+## 📥 2. COPY vs. ADD
+
+Both commands copy files from your host machine into the container image, but `ADD` contains extra automated backend features.
+
+*   **`COPY` (Basic & Preferred)**: Directly copies local files or directories from your host computer into the container filesystem. It is predictable, explicit, and recommended for 95% of standard use cases.
+    *   *Example:* `COPY package.json /app/`
+*   **`ADD` (Advanced Features)**: Copies files but also features two automated background behaviors:
+    *   **Auto-Extraction**: If the source file is a recognized local archive (like `.tar.gz`, `.tar`, or `.xz`), `ADD` automatically unpacks it into the destination directory.
+    *   **Remote URLs**: It can fetch and download files directly from external internet URLs (though using `RUN curl` or `RUN wget` is preferred to prevent layer cache bloat).
+    *   *Example:* `ADD source-code.tar.gz /app/` *(automatically extracts the tar file)*
+
+---
+
+## ⚙️ 3. ENTRYPOINT vs. CMD
+
+Both instructions define what command runs when the container starts up, but they handle runtime command-line arguments differently.
+
+*   **`CMD` (Easily Overridden)**: Acts as a replaceable default instruction. If a user appends an alternate command to `docker run`, the entire `CMD` block is completely discarded and replaced by the user's input.
+    *   *Dockerfile Configuration:* `CMD ["echo", "Hello World"]`
+    *   *Runtime Command:* `docker run my-image hostname`
+    *   *Result:* Output is the system hostname. The `echo Hello World` command is skipped entirely.
+*   **`ENTRYPOINT` (Fixed Executable)**: Sets a permanent, un-replaceable executable command wrapper. If a user appends arguments to `docker run`, those arguments do not replace the command—they are appended directly to the end of the `ENTRYPOINT`.
+    *   *Dockerfile Configuration:* `ENTRYPOINT ["echo"]`
+    *   *Runtime Command:* `docker run my-image Hello World`
+    *   *Result:* Output is `Hello World`. The argument is passed directly to the `echo` system binary.
+
+### 💡 The Pro-Pattern: Combining Both
+
+In production environments, developers frequently combine both instructions. `ENTRYPOINT` defines the fixed application binary, while `CMD` acts as the editable default flags:
+
+```dockerfile
+ENTRYPOINT ["python3", "main.py"]
+CMD ["--mode", "production"]
+```
+
+*   Running `docker run app` executes: 
+    ```bash
+    python3 main.py --mode production
+    ```
+*   Running `docker run app --mode staging` overrides the default `CMD` layer and executes: 
+    ```bash
+    python3 main.py --mode staging
+    ```
 
 ---
 # Simple Docker Build Tutorial
@@ -517,9 +579,9 @@ curl http://localhost:8080
 Hello! Your simple Docker container is running successfully.
 ```
 
+# Multi-Stage Docker Build Guide
 
-
-
+An optimized reference guide demonstrating how to configure, build, and deploy high-performance, secure multi-stage Docker container images.
 
 ## 📄 The Multi-Stage Dockerfile
 
