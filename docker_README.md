@@ -424,4 +424,94 @@ A comprehensive cheat sheet covering standard instructions used to compile and c
     MAINTAINER <name>
     ```
 *   **Details**: Completely deprecated across all modern platforms. Replace this functionality entirely by adopting standardized `LABEL` tags.
+
+# Multi-Stage Docker Build Guide
+
+An optimized reference guide demonstrating how to configure, build, and deploy high-performance, secure multi-stage Docker container images.
+
+---
+
+## 📄 The Multi-Stage Dockerfile
+
+```dockerfile
+# =====================================================================
+# STAGE 1: Build & Compilation (Named "builder")
+# =====================================================================
+# Use a full SDK/runtime image that contains all necessary build tools
+FROM node:20-alpine AS builder
+
+# Set the working directory inside this build layer
+WORKDIR /build
+
+# Copy only dependency manifests first to take advantage of Docker layer caching
+COPY package*.json ./
+
+# Install ALL dependencies (including devDependencies like TypeScript/Linters)
+RUN npm ci
+
+# Copy the rest of the application source code files
+COPY . .
+
+# Run the compilation script (generates optimized files, e.g., in a '/dist' folder)
+RUN npm run build
+
+# Purge development dependencies to keep the 'node_modules' folder strictly minimal
+RUN npm prune --production
+
+
+# =====================================================================
+# STAGE 2: Secure Production Runtime (Named "runner")
+# =====================================================================
+# Start fresh with a clean, lightweight runtime base image
+FROM node:20-alpine AS runner
+
+# Establish optimal production configurations
+ENV NODE_ENV=production
+
+# Set the active execution directory
+WORKDIR /app
+
+# Crucial Security Step: Create a non-root system user and group
+RUN addgroup -g 1001 -S nodegroup && \
+    adduser -u 1001 -S appuser -G nodegroup
+
+# 💡 THE KEY MULTI-STAGE STEP: Copy ONLY production-ready artifacts from STAGE 1
+# This completely discards your source code, build logs, and heavy dev tools.
+COPY --from=builder --chown=appuser:nodegroup /build/package.json ./package.json
+COPY --from=builder --chown=appuser:nodegroup /build/node_modules ./node_modules
+COPY --from=builder --chown=appuser:nodegroup /build/dist ./dist
+
+# Downgrade privileges from root to the limited application user
+USER appuser
+
+# Document the runtime network port boundary
+EXPOSE 3000
+
+# Set the final execution command
+CMD ["node", "dist/index.js"]
+```
+
+---
+
+## ⚡ Key Advantages of This Setup
+
+*   **Minimized Image Size**: Your final runner image doesn't inherit compilers, original uncompiled code, or thousands of testing packages from your dev dependencies.
+*   **Enhanced Security**: Dropping build tools lowers your attack surface. Additionally, switching to `USER appuser` prevents potential container breakout exploits from gaining system root access on your host machine.
+*   **Layer Caching Efficiency**: Splitting the file copies (`package.json` first, then your app code) ensures that Docker doesn't re-download and re-install your dependencies unless your package files explicitly change.
+
+---
+
+## 🚀 How to Build and Run It
+
+### 1. Compile the image
+Execute the build command from your terminal within the same directory containing your `Dockerfile`:
+```bash
+docker build -t my-optimized-app:1.0 .
+```
+
+### 2. Launch the container
+Run the newly compiled image in the background while mapping the network interface boundary ports:
+```bash
+docker run -d -p 3000:3000 --name web-service my-optimized-app:1.0
+```
       
